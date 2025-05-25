@@ -56,18 +56,23 @@ func (b *Bot) handleMessage(msg *tgbotapi.Message) {
 		b.reply(msg.Chat.ID, "Ошибка при получении данных пользователя")
 		return
 	}
-	if user == nil {
+
+	// Разрешаем выполнять /login и /help даже если user == nil
+	if user == nil && !(strings.HasPrefix(text, "/login") || text == "/help") {
 		log.Printf("Пользователь %d не зарегистрирован", userID)
 		b.reply(msg.Chat.ID, "Пользователь не зарегистрирован, используйте /login для регистрации")
 		return
 	}
 
-	monthReset, err := db.ResetIfNewMonth(b.DB.DB, user)
-	if err != nil {
-		log.Printf("Ошибка сброса данных по новому месяцу для пользователя %d: %v", userID, err)
-	} else if monthReset {
-		log.Printf("Новый месяц, сброс трат для пользователя %d", userID)
-		b.reply(msg.Chat.ID, "Наступил новый месяц, траты обнулены!")
+	// Если месяц сменился - сбросим расходы, но только если пользователь зарегистрирован
+	if user != nil {
+		monthReset, err := db.ResetIfNewMonth(b.DB.DB, user)
+		if err != nil {
+			log.Printf("Ошибка сброса данных по новому месяцу для пользователя %d: %v", userID, err)
+		} else if monthReset {
+			log.Printf("Новый месяц, сброс трат для пользователя %d", userID)
+			b.reply(msg.Chat.ID, "Наступил новый месяц, траты обнулены!")
+		}
 	}
 
 	switch {
@@ -104,7 +109,7 @@ func (b *Bot) cmdLogin(msg *tgbotapi.Message, userID int64, text string) {
 	exists, err := db.ExistsGithubLogin(b.DB.DB, githubLogin)
 	if err != nil {
 		log.Printf("Ошибка базы данных при проверке githubLogin %q: %v", githubLogin, err)
-		b.reply(msg.Chat.ID, "Ошибка базы данных")
+		b.reply(msg.Chat.ID, "Произошла ошибка при работе с базой данных")
 		return
 	}
 	if exists {
@@ -139,7 +144,7 @@ func (b *Bot) cmdLogin(msg *tgbotapi.Message, userID int64, text string) {
 func (b *Bot) cmdSetBudget(msg *tgbotapi.Message, userID int64, text string) {
 	user, err := db.GetUserByTelegramID(b.DB.DB, userID)
 	if err != nil || user == nil {
-		b.reply(msg.Chat.ID, "Сначала выполните регистрацию через /login github_username")
+		b.reply(msg.Chat.ID, "Пожалуйста, зарегистрируйтесь с помощью /login github_username")
 		return
 	}
 
@@ -169,7 +174,7 @@ func (b *Bot) cmdSetBudget(msg *tgbotapi.Message, userID int64, text string) {
 func (b *Bot) cmdSpend(msg *tgbotapi.Message, userID int64, text string) {
 	user, err := db.GetUserByTelegramID(b.DB.DB, userID)
 	if err != nil || user == nil {
-		b.reply(msg.Chat.ID, "Сначала выполните регистрацию через /login github_username")
+		b.reply(msg.Chat.ID, "Пожалуйста, зарегистрируйтесь с помощью /login github_username")
 		return
 	}
 
@@ -197,13 +202,13 @@ func (b *Bot) cmdSpend(msg *tgbotapi.Message, userID int64, text string) {
 		return
 	}
 
-	b.reply(msg.Chat.ID, fmt.Sprintf("Расходны обновлены, всего потрачено %.2f из %.2f", newSpent, user.MonthlyBudget))
+	b.reply(msg.Chat.ID, fmt.Sprintf("Расходы обновлены, всего потрачено %.2f из %.2f", newSpent, user.MonthlyBudget))
 }
 
 func (b *Bot) cmdResetSpent(msg *tgbotapi.Message, userID int64) {
 	user, err := db.GetUserByTelegramID(b.DB.DB, userID)
 	if err != nil || user == nil {
-		b.reply(msg.Chat.ID, "Сначала выполните регистрацию через /login github_username")
+		b.reply(msg.Chat.ID, "Пожалуйста, зарегистрируйтесь с помощью /login github_username")
 		return
 	}
 
@@ -226,7 +231,7 @@ func (b *Bot) cmdHelp(msg *tgbotapi.Message) {
 	text := `/login github_username - зарегистрироваться через GitHub
 /setbudget сумма - установить месячный бюджет
 /spend сумма - добавить сумму расхода
-/resetspent — сбросить расходы текущего месяца
+/resetspent - сбросить расходы текущего месяца
 /help - показать эту справку
 
 Если возникли проблемы или есть предложения, пожалуйста, создайте issue в репозитории:
