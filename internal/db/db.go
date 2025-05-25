@@ -84,7 +84,7 @@ func ResetIfNewMonth(db *sql.DB, u *User) (bool, error) {
 		if err != nil {
 			return false, err
 		}
-		// Обновляем структуру пользователя в памяти
+		// runtime update
 		u.Spent = 0
 		u.BudgetMonth = currentMonth
 		return true, nil
@@ -102,4 +102,20 @@ func ResetSpent(db *sql.DB, telegramID int64) error {
 func UpdateSpent(db *sql.DB, userID int64, newSpent float64) error {
 	_, err := db.Exec("UPDATE users SET spent = ? WHERE telegram_id = ?", newSpent, userID)
 	return err
+}
+
+// Проверить баланс
+func GetUserBalance(db *sql.DB, telegramID int64) (float64, error) {
+	row := db.QueryRow(`SELECT monthly_budget, spent FROM users WHERE telegram_id = ?`, telegramID)
+
+	var monthlyBudget, spent float64
+	err := row.Scan(&monthlyBudget, &spent)
+	if err == sql.ErrNoRows {
+		return 0, nil
+	}
+	if err != nil {
+		return 0, err
+	}
+
+	return monthlyBudget - spent, nil
 }

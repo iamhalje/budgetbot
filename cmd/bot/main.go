@@ -36,6 +36,9 @@ func main() {
 	database := &db.DB{DB: dbConnection}
 	b := bot.NewBot(botAPI, database)
 
+	// setup menu
+	b.SetBotCommands()
+
 	log.Printf("Bot started @%s", botAPI.Self.UserName)
 
 	b.HandleUpdates()

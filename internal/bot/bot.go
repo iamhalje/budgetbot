@@ -22,6 +22,25 @@ type Bot struct {
 	DB     *db.DB
 }
 
+func (b *Bot) SetBotCommands() {
+	commands := []tgbotapi.BotCommand{
+		{Command: "login", Description: "Регистрация: /login github_username"},
+		{Command: "setbudget", Description: "Установить бюджет: /setbudget сумма"},
+		{Command: "spend", Description: "Добавить расход: /spend сумма"},
+		{Command: "resetspent", Description: "Сбросить расходы текущего месяца"},
+		{Command: "balance", Description: "Проверить баланс"},
+		{Command: "help", Description: "Показать список команд и описание"},
+	}
+
+	config := tgbotapi.NewSetMyCommands(commands...)
+
+	if _, err := b.BotAPI.Request(config); err != nil {
+		log.Printf("Ошибка при установке команд: %v", err)
+	} else {
+		log.Println("Команды успешно установлены!")
+	}
+}
+
 func NewBot(botAPI *tgbotapi.BotAPI, database *db.DB) *Bot {
 	return &Bot{
 		BotAPI: botAPI,
@@ -91,6 +110,9 @@ func (b *Bot) handleMessage(msg *tgbotapi.Message) {
 	case strings.HasPrefix(text, "/resetspent"):
 		log.Printf("Команда /resetspent от пользователя %d", userID)
 		b.cmdResetSpent(msg, userID)
+	case strings.HasPrefix(text, "/balance"):
+		log.Printf("Команда /balance от пользователя %d", userID)
+		b.cmdBalance(msg, userID)
 	default:
 		log.Printf("Неизвестная команда от пользователя %d: %q", userID, text)
 		b.reply(msg.Chat.ID, "Команда не определена, используйте /help для вывода списка команд")
@@ -227,15 +249,24 @@ func (b *Bot) cmdResetSpent(msg *tgbotapi.Message, userID int64) {
 	b.reply(msg.Chat.ID, "Расходы успешно сброшены на 0 для текущего месяца")
 }
 
+func (b *Bot) cmdBalance(msg *tgbotapi.Message, userID int64) {
+	balance, err := db.GetUserBalance(b.DB.DB, userID)
+	if err != nil {
+		log.Printf("Ошибка при получении баланса: %v", err)
+		b.reply(msg.Chat.ID, "Ошибка при получении вашего баланса.")
+		return
+	}
+
+	log.Printf("Пользователь %d запросил /balance: баланс %.2f рублей", userID, balance)
+	b.reply(msg.Chat.ID, fmt.Sprintf("Ваш текущий баланс: %.2f рублей", balance))
+}
+
 func (b *Bot) cmdHelp(msg *tgbotapi.Message) {
-	text := `/login github_username - зарегистрироваться через GitHub
-/setbudget сумма - установить месячный бюджет
-/spend сумма - добавить сумму расхода
-/resetspent - сбросить расходы текущего месяца
-/help - показать эту справку
+	text := `
+Этот бот помогает контролировать личные расходы, устанавливая месячный бюджет и отслеживая траты. Идеально, если копишь на цель и хочешь не выходить за месячные рамки.
 
 Если возникли проблемы или есть предложения, пожалуйста, создайте issue в репозитории:
-https://github.com/iamhalje/MonthlyBudgetBot/issues`
+https://github.com/iamhalje/budgetbot/issues`
 	b.reply(msg.Chat.ID, text)
 }
 
