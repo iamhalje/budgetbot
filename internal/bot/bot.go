@@ -257,8 +257,8 @@ func (b *Bot) cmdBalance(msg *tgbotapi.Message, userID int64) {
 		return
 	}
 
-	log.Printf("Пользователь %d запросил /balance: баланс %.2f рублей", userID, balance)
-	b.reply(msg.Chat.ID, fmt.Sprintf("Ваш текущий баланс: %.2f рублей", balance))
+	log.Printf("Пользователь %d запросил /balance: баланс %.2f", userID, balance)
+	b.reply(msg.Chat.ID, fmt.Sprintf("Ваш текущий баланс: %.2f", balance))
 }
 
 func (b *Bot) cmdHelp(msg *tgbotapi.Message) {
